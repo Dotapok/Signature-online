@@ -1,0 +1,152 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Modèle pour les utilisateurs (expéditeurs)
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String?
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  contracts     Contract[] @relation("ContractOwner")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// Modèle pour les comptes OAuth
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+// Modèle pour les sessions utilisateur
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Modèle pour les demandes de vérification d'email
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Modèle pour les contrats
+model Contract {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  fileId      String     @unique // Référence au fichier dans MinIO/S3
+  fileName    String
+  fileSize    Int        // Taille en octets
+  fileType    String     // Type MIME du fichier
+  status      ContractStatus @default(DRAFT)
+  ownerId     String
+  owner       User       @relation("ContractOwner", fields: [ownerId], references: [id])
+  signers     Signer[]
+  events      Event[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  expiresAt   DateTime?
+  signedAt    DateTime?
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+// Modèle pour les signataires
+model Signer {
+  id           String   @id @default(cuid())
+  email        String
+  name         String?
+  token        String   @unique // Token unique pour l'URL de signature
+  signedAt     DateTime?
+  signatureUrl String?  // URL de la signature (image)
+  contractId   String
+  contract     Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  events       Event[]
+  order        Int      // Ordre de signature
+  
+  @@unique([contractId, email])
+  @@index([email])
+  @@index([contractId])
+}
+
+// Modèle pour les événements (historique des actions)
+model Event {
+  id         String    @id @default(cuid())
+  type       EventType
+  data       Json?     // Données supplémentaires de l'événement
+  ipAddress  String?
+  userAgent  String?
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  signerId   String?
+  signer     Signer?   @relation(fields: [signerId], references: [id])
+  createdAt  DateTime  @default(now())
+
+  @@index([contractId])
+  @@index([signerId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// Énumération pour le statut du contrat
+enum ContractStatus {
+  DRAFT     // Brouillon
+  SENT      // Envoyé aux signataires
+  IN_PROGRESS // En cours de signature
+  SIGNED    // Signé par tous les signataires
+  DECLINED  // Refusé par un signataire
+  EXPIRED   // Expiré
+  CANCELLED // Annulé par l'expéditeur
+}
+
+// Énumération pour le type d'événement
+enum EventType {
+  CONTRACT_CREATED    // Création du contrat
+  CONTRACT_UPDATED    // Mise à jour du contrat
+  CONTRACT_SENT       // Contrat envoyé aux signataires
+  CONTRACT_SIGNED     // Contrat signé par un signataire
+  CONTRACT_DECLINED   // Contrat refusé par un signataire
+  CONTRACT_COMPLETED  // Contrat signé par tous les signataires
+  CONTRACT_EXPIRED    // Contrat expiré
+  CONTRACT_CANCELLED  // Contrat annulé
+  SIGNER_VIEWED       // Signataire a visualisé le contrat
+  SIGNER_SIGNED       // Signataire a signé le contrat
+  SIGNER_DECLINED     // Signataire a refusé de signer
+  REMINDER_SENT       // Rappel envoyé à un signataire
+}
