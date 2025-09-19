@@ -1,19 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSession, signOut, getSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { Dashboard } from '@/components/dashboard';
-import { authOptions } from '@/lib/auth';
-import { getServerSession } from 'next-auth/next';
 
-// Fonction pour obtenir la session côté serveur
-async function getServerSideProps() {
-  const session = await getServerSession(authOptions);
-  return { props: { session } };
-}
-
-export default function DashboardPage() {
+function DashboardContent() {
   const router = useRouter();
   const { data: session, status, update } = useSession();
   const [isCheckingSession, setIsCheckingSession] = useState(true);
@@ -76,4 +68,16 @@ export default function DashboardPage() {
 
   // Ne rien afficher par défaut (pendant la redirection)
   return null;
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
+  );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText } from 'lucide-react';
 
-export default function SignUpPage() {
+function SignUpForm() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -105,7 +105,7 @@ export default function SignUpPage() {
             </div>
           )}
           {error && (
-            <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">
+            <div className="bg-red-50 text-red-700 p-3 rounded-md text-sm mb-4 border border-red-200">
               {error}
             </div>
           )}
@@ -114,8 +114,7 @@ export default function SignUpPage() {
               <Label htmlFor="name">Nom complet</Label>
               <Input
                 id="name"
-                type="text"
-                placeholder="Votre nom complet"
+                placeholder="Votre nom"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -126,7 +125,7 @@ export default function SignUpPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="email@exemple.com"
+                placeholder="votre@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -137,27 +136,29 @@ export default function SignUpPage() {
               <Input
                 id="password"
                 type="password"
-                placeholder="Créez un mot de passe"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
               />
+              <p className="text-xs text-muted-foreground">
+                Le mot de passe doit contenir au moins 6 caractères.
+              </p>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
-                <div className="h-4 w-4 border-2 border-muted-foreground/50 border-t-muted-foreground rounded-full animate-spin mr-2" />
-              ) : null}
-              {isLoading ? 'Inscription en cours...' : 'S\'inscrire'}
+              {isLoading ? 'Création du compte...' : 'Créer un compte'}
             </Button>
-            
-            <p className="text-xs text-muted-foreground mt-2">
-              En vous inscrivant, vous acceptez nos conditions d'utilisation et notre politique de confidentialité.
-            </p>
           </form>
 
-          <div className="text-center text-sm text-muted-foreground">
-            Vous avez déjà un compte ? {' '}
+          <div className="mt-4 text-center text-sm">
+            Vous avez déjà un compte ?{' '}
+            <Button
+              variant="link"
+              className="h-auto p-0 text-primary"
+              onClick={() => router.push('/auth/signin')}
+            >
+              Se connecter
+            </Button>
             <a href="/auth/signin" className="font-medium text-primary hover:underline">
               Connectez-vous
             </a>
@@ -165,5 +166,17 @@ export default function SignUpPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    }>
+      <SignUpForm />
+    </Suspense>
   );
 }

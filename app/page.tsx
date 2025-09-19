@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 
-export default function HomePage() {
+function HomePageContent() {
   const router = useRouter();
   const { status } = useSession();
 
@@ -30,4 +30,16 @@ export default function HomePage() {
 
   // Ne rien afficher pendant la redirection
   return null;
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    }>
+      <HomePageContent />
+    </Suspense>
+  );
 }
