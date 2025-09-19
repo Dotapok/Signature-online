@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, Suspense } from 'react';
 import { useSession, signIn, signOut, getSession } from 'next-auth/react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Session } from 'next-auth';
@@ -20,7 +20,7 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+function AuthProviderInternal({ children }: { children: React.ReactNode }) {
   const { data: session, status, update } = useSession();
   const [user, setUser] = useState<User | null>(null);
   const router = useRouter();
@@ -86,6 +86,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">Chargement...</p>
+        </div>
+      </div>
+    }>
+      <AuthProviderInternal>{children}</AuthProviderInternal>
+    </Suspense>
+  );
+}
+
+
 // Custom hook to use the auth context
 export function useAuth() {
   const context = useContext(AuthContext);
@@ -95,52 +111,69 @@ export function useAuth() {
   return context;
 }
 
+function WithAuthInternal({ Component, props }: { Component: React.ComponentType<any>, props: any }) {
+  const { status } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      setIsRedirecting(true);
+      let callbackUrl = pathname || '/';
+      const params = searchParams?.toString();
+      if (params) {
+        callbackUrl += `?${params}`;
+      }
+      // Utiliser replace au lieu de push pour éviter d'ajouter à l'historique
+      router.replace(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+    } else if (status === 'authenticated') {
+      setIsRedirecting(false);
+    }
+  }, [status, router, pathname, searchParams]);
+
+  // Afficher un écran de chargement pendant la vérification de l'authentification
+  // ou pendant la redirection
+  if (status === 'loading' || isRedirecting) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Ne rendre le composant que si l'utilisateur est authentifié
+  if (status === 'authenticated') {
+    return <Component {...props} />;
+  }
+
+  // Par défaut, ne rien afficher (en attendant la redirection)
+  return null;
+}
+
+
 // Higher Order Component to protect pages that require authentication
 export function withAuth(Component: React.ComponentType<any>) {
   return function WithAuth(props: any) {
-    const { status } = useAuth();
-    const router = useRouter();
-    const pathname = usePathname();
-    const searchParams = useSearchParams();
-    const [isRedirecting, setIsRedirecting] = useState(false);
-
-    useEffect(() => {
-      if (status === 'unauthenticated') {
-        setIsRedirecting(true);
-        let callbackUrl = pathname || '/';
-        const params = searchParams?.toString();
-        if (params) {
-          callbackUrl += `?${params}`;
-        }
-        // Utiliser replace au lieu de push pour éviter d'ajouter à l'historique
-        router.replace(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`);
-      } else if (status === 'authenticated') {
-        setIsRedirecting(false);
-      }
-    }, [status, router, pathname, searchParams]);
-
-    // Afficher un écran de chargement pendant la vérification de l'authentification
-    // ou pendant la redirection
-    if (status === 'loading' || isRedirecting) {
-      return (
+    return (
+      <Suspense fallback={
         <div className="flex items-center justify-center min-h-screen bg-background">
           <div className="flex flex-col items-center space-y-4">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
             <p className="text-muted-foreground">Chargement...</p>
           </div>
         </div>
-      );
-    }
-
-    // Ne rendre le composant que si l'utilisateur est authentifié
-    if (status === 'authenticated') {
-      return <Component {...props} />;
-    }
-
-    // Par défaut, ne rien afficher (en attendant la redirection)
-    return null;
+      }>
+        <WithAuthInternal Component={Component} props={props} />
+      </Suspense>
+    );
   };
 }
+
 
 // Higher Order Component to protect API routes
 export function withApiAuth(handler: any) {
