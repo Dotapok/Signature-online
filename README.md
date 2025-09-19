@@ -171,7 +171,7 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 
 ## Auteurs
 
-- [Votre nom] - [Votre email]
+- Dotapok - dotapok@gmail.com
 
 ## Remerciements
 
